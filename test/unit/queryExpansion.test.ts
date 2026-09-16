@@ -27,4 +27,37 @@ describe("元数据智能对齐引擎 - queryExpansion", () => {
     // 第二次缓存命中耗时应当极短 (< 5ms)
     expect(end - mid).toBeLessThan(10);
   });
+
+  it("典藏高频大片与动漫番剧应能快速命中并精准返回原版标题与年份", async () => {
+    const shawshank = await resolveEnglishTitle("肖申克的救赎");
+    expect(shawshank).not.toBeNull();
+    expect(shawshank?.originalTitle).toBe("The Shawshank Redemption");
+    expect(shawshank?.year).toBe("1994");
+
+    const demonSlayer = await resolveEnglishTitle("鬼灭之刃");
+    expect(demonSlayer).not.toBeNull();
+    expect(demonSlayer?.originalTitle).toBe("Demon Slayer");
+    expect(demonSlayer?.type).toBe("tv");
+
+    const spyFamily = await resolveEnglishTitle("间谍过家家");
+    expect(spyFamily).not.toBeNull();
+    expect(spyFamily?.originalTitle).toBe("SPY×FAMILY");
+
+    const titan = await resolveEnglishTitle("进击的巨人");
+    expect(titan).not.toBeNull();
+    expect(titan?.originalTitle).toBe("Attack on Titan");
+  });
+
+  it("未知或生僻中文输入应优雅降级返回 null 并记录空缓存", async () => {
+    const unknown = await resolveEnglishTitle("某某完全不存在的生僻长篇小说电影版9999");
+    expect(unknown).toBeNull();
+
+    // 再次查询立即从空缓存返回
+    const start = Date.now();
+    const cachedUnknown = await resolveEnglishTitle("某某完全不存在的生僻长篇小说电影版9999");
+    const end = Date.now();
+    expect(cachedUnknown).toBeNull();
+    expect(end - start).toBeLessThan(10);
+  });
 });
+

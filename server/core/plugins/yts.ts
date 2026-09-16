@@ -83,26 +83,29 @@ export class YtsPlugin extends BaseAsyncPlugin {
     }
 
     let resp: YtsResponse | null = null;
-    for (const endpoint of YTS_ENDPOINTS) {
-      try {
-        const url = `${endpoint}?query_term=${encodeURIComponent(
-          queryTerm
-        )}&sort_by=seeds&limit=20`;
-        resp = await ofetch<YtsResponse>(url, {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            Accept: "application/json",
-          },
-          timeout: timeoutMs,
-          retry: 0,
-        });
-        if (resp?.status === "ok" && Array.isArray(resp?.data?.movies)) {
-          break;
-        }
-      } catch {
-        // 继续尝试备用镜像
+    const fetchPromises = YTS_ENDPOINTS.map(async (endpoint) => {
+      const url = `${endpoint}?query_term=${encodeURIComponent(
+        queryTerm
+      )}&sort_by=seeds&limit=20`;
+      const data = await ofetch<YtsResponse>(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          Accept: "application/json",
+        },
+        timeout: timeoutMs,
+        retry: 0,
+      });
+      if (data?.status === "ok" && Array.isArray(data?.data?.movies)) {
+        return data;
       }
+      throw new Error("Invalid YTS response format");
+    });
+
+    try {
+      resp = await Promise.any(fetchPromises);
+    } catch {
+      resp = null;
     }
 
     if (resp?.status !== "ok" || !Array.isArray(resp?.data?.movies)) {
@@ -122,7 +125,8 @@ export class YtsPlugin extends BaseAsyncPlugin {
         // 过滤零做种死种
         if (typeof t.seeds === "number" && t.seeds <= 0) continue;
 
-        const releaseTitle = `${baseTitle}${year} [${t.quality.toUpperCase()}] [${(t.type || "BluRay").toUpperCase()}] [YTS]`;
+        const zhPrefix = /[\u4e00-\u9fa5]/.test(rawKw) ? `【${rawKw}】` : "";
+        const releaseTitle = `${zhPrefix}${baseTitle}${year} [${t.quality.toUpperCase()}] [${(t.type || "BluRay").toUpperCase()}] [YTS]`;
         const magnetUrl = buildYtsMagnet(t.hash, releaseTitle);
 
         const tags: string[] = ["YTS", t.quality.toUpperCase(), "BT磁力"];
@@ -139,7 +143,7 @@ export class YtsPlugin extends BaseAsyncPlugin {
           channel: "YTS",
           datetime: t.date_uploaded || (movie.year ? `${movie.year}-01-01 00:00:00` : undefined),
           title: releaseTitle,
-          content: `【YTS 蓝光高清】做种健康度: ${t.seeds} Seeds / ${t.peers} Peers | 文件体积: ${t.size} | IMDb评分: ${movie.rating || "N/A"}`,
+          content: `【YTS 蓝光高清】${rawKw ? `关联影视: ${rawKw} | ` : ""}做种健康度: ${t.seeds} Seeds / ${t.peers} Peers | 文件体积: ${t.size} | IMDb评分: ${movie.rating || "N/A"}`,
           links: [
             {
               type: "magnet",

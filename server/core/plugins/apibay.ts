@@ -111,6 +111,7 @@ export class ApiBayPlugin extends BaseAsyncPlugin {
               ? "[信任认证] "
               : "";
 
+          const zhPrefix = /[\u4e00-\u9fa5]/.test(rawKw) ? `【${rawKw}】` : "";
           const magnet = `magnet:?xt=urn:btih:${item.info_hash.toLowerCase()}&dn=${encodeURIComponent(
             item.name
           )}&${DEFAULT_TRACKERS}`;
@@ -120,8 +121,8 @@ export class ApiBayPlugin extends BaseAsyncPlugin {
             unique_id: `apibay-${item.info_hash.toLowerCase()}`,
             channel: "ApiBay (海盗湾开源)",
             datetime: new Date().toISOString(),
-            title: `${badge}${item.name}${sizeText ? ` [${sizeText}]` : ""}`,
-            content: `${seedText}${item.imdb ? ` | IMDb: ${item.imdb}` : ""}`,
+            title: `${zhPrefix}${badge}${item.name}${sizeText ? ` [${sizeText}]` : ""}`,
+            content: `${seedText}${rawKw ? ` | 关联影视: ${rawKw}` : ""}${item.imdb ? ` | IMDb: ${item.imdb}` : ""}`,
             links: [{ type: "magnet", url: magnet, password: "" }],
           });
         }
