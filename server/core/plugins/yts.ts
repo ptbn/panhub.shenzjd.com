@@ -7,6 +7,7 @@
 
 import { BaseAsyncPlugin, registerGlobalPlugin } from "./manager";
 import type { SearchResult } from "../types/models";
+import { calculateMagnetMeta } from "../utils/magnetHealth";
 import { ofetch } from "ofetch";
 import { resolveEnglishTitle } from "../utils/queryExpansion";
 
@@ -148,6 +149,8 @@ export class YtsPlugin extends BaseAsyncPlugin {
             {
               type: "magnet",
               url: magnetUrl,
+              password: "",
+              magnetMeta: calculateMagnetMeta(t.seeds, t.peers),
             },
           ],
           tags,

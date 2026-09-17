@@ -1,5 +1,6 @@
 import { BaseAsyncPlugin, registerGlobalPlugin } from "./manager";
 import type { SearchResult } from "../types/models";
+import { calculateMagnetMeta } from "../utils/magnetHealth";
 import { ofetch } from "ofetch";
 import { load } from "cheerio";
 
@@ -87,6 +88,9 @@ export class X1337xPlugin extends BaseAsyncPlugin {
         const href = String(titleA.attr("href") || "");
         const detail = href.startsWith("/") ? `${BASE}${href}` : href;
         const unique = `1337x-${detail.split("/").pop()}`;
+        const seeds = parseInt(row.find("td.coll-2").text().trim(), 10);
+        const leeches = parseInt(row.find("td.coll-3").text().trim(), 10);
+        const magnetMeta = calculateMagnetMeta(seeds, leeches);
         count += 1;
         tasks.push(
           (async () => {
@@ -103,7 +107,7 @@ export class X1337xPlugin extends BaseAsyncPlugin {
               datetime: new Date().toISOString(),
               title,
               content: "",
-              links: [{ type: "magnet", url: magnet, password: "" }],
+              links: [{ type: "magnet", url: magnet, password: "", magnetMeta }],
             });
           })()
         );

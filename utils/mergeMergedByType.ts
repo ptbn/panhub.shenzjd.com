@@ -51,6 +51,17 @@ export function mergeMergedByType(
         if (!existing.description && item.description) {
           existing.description = item.description;
         }
+        if (!existing.magnetMeta && item.magnetMeta) {
+          existing.magnetMeta = item.magnetMeta;
+        } else if (
+          existing.magnetMeta &&
+          item.magnetMeta &&
+          typeof item.magnetMeta.seeders === "number" &&
+          (existing.magnetMeta.seeders === undefined ||
+            item.magnetMeta.seeders > existing.magnetMeta.seeders)
+        ) {
+          existing.magnetMeta = item.magnetMeta;
+        }
         continue;
       }
 

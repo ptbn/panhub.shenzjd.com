@@ -1,5 +1,6 @@
 import { BaseAsyncPlugin, registerGlobalPlugin } from "./manager";
 import type { SearchResult } from "../types/models";
+import { calculateMagnetMeta } from "../utils/magnetHealth";
 import { ofetch } from "ofetch";
 import { load } from "cheerio";
 
@@ -177,6 +178,7 @@ export class SolidTorrentsPlugin extends BaseAsyncPlugin {
       if (typeof it.leechers === "number")
         parts.push(`Leechers: ${it.leechers}`);
       if (it.uploaded) parts.push(`Uploaded: ${it.uploaded}`);
+      const magnetMeta = calculateMagnetMeta(it.seeders, it.leechers);
       out.push({
         message_id: "",
         unique_id: unique,
@@ -184,7 +186,7 @@ export class SolidTorrentsPlugin extends BaseAsyncPlugin {
         datetime: "",
         title,
         content: parts.join(" | "),
-        links: [{ type: "magnet", url: magnet, password: "" }],
+        links: [{ type: "magnet", url: magnet, password: "", magnetMeta }],
       });
     }
     return out;

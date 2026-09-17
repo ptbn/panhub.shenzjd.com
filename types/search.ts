@@ -4,6 +4,12 @@
  * Server: server/core/types/models.ts 保留 server 专用类型
  */
 
+export interface MagnetMeta {
+  seeders?: number;
+  leechers?: number;
+  healthLevel: "hot" | "warm" | "cold" | "dead";
+}
+
 export interface MergedLink {
   url: string;
   password: string;
@@ -12,6 +18,7 @@ export interface MergedLink {
   source?: string;
   images?: string[];
   description?: string;
+  magnetMeta?: MagnetMeta;
 }
 
 export type MergedLinks = Record<string, MergedLink[]>;
@@ -32,6 +39,7 @@ export interface Link {
   type: string;
   url: string;
   password: string;
+  magnetMeta?: MagnetMeta;
 }
 
 export interface SearchResponse {

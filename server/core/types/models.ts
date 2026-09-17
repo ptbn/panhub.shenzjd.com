@@ -1,7 +1,14 @@
+export interface MagnetMeta {
+  seeders?: number;
+  leechers?: number;
+  healthLevel: "hot" | "warm" | "cold" | "dead";
+}
+
 export interface Link {
   type: string;
   url: string;
   password: string;
+  magnetMeta?: MagnetMeta;
 }
 
 export interface SearchResult {
@@ -24,6 +31,7 @@ export interface MergedLink {
   source?: string; // e.g. "tg:channel" or "plugin:name"
   images?: string[];
   description?: string;
+  magnetMeta?: MagnetMeta;
 }
 
 export type MergedLinks = Record<string, MergedLink[]>;

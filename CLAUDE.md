@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PanHub is a Nuxt 4 web application that aggregates search results from Telegram channels and external plugin sites to find cloud storage resources (Aliyun, Quark, Baidu, 115, Xunlei, etc.). It supports priority-based batch processing, unified LRU caching with namespaces, and deploys to Cloudflare Workers (default), Vercel, or Docker.
+PanHub-Home 是基于 Nuxt 4 + TypeScript 构建的高性能边缘影音中枢与网盘/磁力搜索调度系统。深度联动家庭私有云（绿联 DX4600 NAS、AList、qBittorrent v5.x 与芝杜 Z9X 播放器），支持 Cloudflare Workers 边缘轻量部署并由 Cloudflare D1 数据库提供底层持久化支撑。
 
-**开源版定位**：无数据库（无 Turso/SQLite/D1）、无后台管理、无统计/热搜功能、无爬虫黑名单/蜜罐。搜索词与用户身份不落盘。
+**核心定位**：具备生产级 D1 数据库、多租户安全隔离、NAS 三大推送协议、qB 实时遥测 SSOT 看板、磁力健康度雷达与冷热存储分层调度能力。不再依赖任何外部微信验证码或广告解锁服务。
 
 ## Package Manager
 
@@ -54,23 +54,23 @@ npm run deploy:cf       # Deploy to Cloudflare Workers
 - **`utils/fetch.ts`**: Network wrapper with retry/timeout (via `fetchWithRetry`). **`utils/searchKeyword.ts`**: Builds keyword variants for deep search (CJK-aware splitting, noise filtering). **`utils/errors.ts`**: Error classification and `ErrorCollector`. **`utils/logger.ts`**: Logging.
 - **`types/models.ts`**: Core interfaces — `SearchResult`, `MergedLink`, `MergedLinks`, `SearchResponse`, `SearchRequest`.
 
-### Authentication
+### Authentication & Multi-Tenancy
 
-搜索接口写死强制微信公众号登录（`server/utils/requireAuth.ts` + `server/utils/wxAuthCheck.ts`）：
-
-- 网页端：关注公众号 + 验证码后由 wx-auth-sdk 种下 `wxauth-token` cookie
-- 小程序端：`Authorization: Bearer <wx-auth token>`
-- 两类凭证统一转发 wx-auth 服务 `/api/auth/check` 权威校验（默认 `https://wx-auth.shenzjd.com`，可用 `WX_AUTH_API_BASE` 覆盖），校验结果有 10min 跨请求缓存；服务故障 fail-closed 拒绝
-- 另有 bot UA 入口 403（`utils/botUA.ts`）与全局限流中间件（`server/middleware/rateLimiter.ts`，纯内存固定窗口）
+系统采用自研 SaaS 级用户认证与凭证管理体系（`server/utils/authSession.ts` + Cloudflare D1）：
+- 注册与邀请码：支持一次性注册邀请码机制与超级管理员自举（`/admin` 界面全生命周期管理）；
+- 凭证加密：用户配置的 NAS、AList、qBittorrent 访问 Token 与密码通过 Web Crypto API (AES-GCM) 硬件级加密入库；
+- 多租户严格隔离：所有接口基于 `user_id` 强校验，无专属配置严禁越权降级，前端在登录和会话激活时主动静默回水同步；
+- 公共搜索放行：常规网盘与磁力搜索纯净放行，爬虫 UA 拦截 403，全局内存固定窗口限流保护。
 
 ### Client-Side
 
-- **`pages/index/index.vue`**: Home page with hero, search box, results, Douban section.
-- **`composables/useSearch.ts`**: Search state machine (loading → deepLoading → done), with pause/resume, SSE 流式接入与 402 配额回调。
-- **`composables/useSettings.ts`**: User settings (concurrency, timeout).
-- **`composables/useWxAuth.ts`**: 登录态管理（checkSearchAuth / forceVerify）。
-- **`utils/extractMergedFromResponse.ts`** + **`utils/mergeMergedByType.ts`**: Client-side result merging helpers.
-- **Components**: `SearchBox`, `ResultGroup`, `ResultHeader`, `DoubanHotSection`, `SettingsDrawer`。认证弹窗由 wx-auth-sdk 提供（`WxAuth.showAuthModal()`）。
+- **`pages/index/index.vue`**: 首页视图，整合智能紧凑吸顶搜索栏、多维过滤、7:3 资源与字幕流光排版、豆瓣热榜。
+- **`components/PushDrawer.vue`**: NAS 推送抽屉，支持方案 A (AList 动态免转存挂载)、方案 B (网盘转存穿透刷新)、方案 C (qB 原生满速离线下载)。
+- **`components/NasTasksDrawer.vue`**: qBittorrent 原生 SSOT 实时下载监控抽屉（速率/做种/ETA/控制）。
+- **`components/NasSettingsModal.vue`**: 【我的 NAS】私有化节点配置弹窗，支持 D1 持久化。
+- **`composables/useSearch.ts`**: SSE 流式搜索状态机、分页加载、多源合并。
+- **`composables/useNasProfile.ts`**: 用户专属 NAS 配置状态管理、D1 自动回水同步。
+- **`utils/extractMergedFromResponse.ts`** + **`utils/mergeMergedByType.ts`**: 结果解析与健康度择优合并。
 
 ### Configuration (`config/`)
 
@@ -82,21 +82,19 @@ npm run deploy:cf       # Deploy to Cloudflare Workers
 
 All routes use the `name.method.ts` convention (e.g., `search.get.ts`).
 
-Key routes: `search.get.ts`/`search.post.ts`（传统批量）、`search.stream.get.ts`（SSE 流式，前端主用）、`douban-hot.get.ts`, `img.get.ts` (image proxy), `health.get.ts`, `plugin-health.get.ts`, `check.post.ts`（链接探活）。
+Key routes: `search.stream.get.ts`（SSE 流式搜索，前端主用）、`nas/push.post.ts`（统一推送调度）、`nas/mount-share.post.ts`（方案 A 动态只读挂载）、`nas/tasks.get.ts`（qB 实时监控）、`nas/archive.post.ts`（冷热存储分层移动）、`auth/login.post.ts`（多租户会话）。
 
-Route rules in `nuxt.config.ts` disable caching for auth/search API routes (SWR 3600 only on `/**` catch-all).
+Route rules in `nuxt.config.ts` disable caching for auth/search/nas API routes.
 
 ## Deployment
 
-- **Cloudflare Workers** (default): `wrangler.toml` with `nodejs_compat` flag. `npm run deploy:cf` or `wrangler deploy`.
-- **Vercel**: Auto-detected via `VERCEL` env var. Sets `nitro.preset: "vercel"`.
-- **Docker**: `Dockerfile` uses `node:20-alpine`, builds with `NITRO_PRESET=node-server`. 无数据卷需求。
-- **Nitro preset**: Auto-detected via `NITRO_PRESET` env var or platform detection.
+- **Cloudflare Workers** (default): `wrangler.toml` with `nodejs_compat` flag. `npm run build:cf` then `npm run deploy:cf`.
+- **Nitro preset**: `$env:NITRO_PRESET="cloudflare_module"; npx nuxt build` 构建打包，确保 ESM 自包含。
 
 ## CI/CD (`.github/workflows/`)
 
-- **`docker-image.yml`**: Builds and pushes Docker image to GHCR (`ghcr.io/<owner>/<repo>`, derived from the repository name) on push to `main`. Uses only `GITHUB_TOKEN` — no extra secrets needed.
-- **`sync-upstream.yml`**: Daily cron (03:00 UTC) merges from upstream `main` into fork's default branch — keeps downstream forks in sync with the open-source repo.
+- **`ci.yml`**: GitHub Actions 自动化质检门禁。在 push / PR 到 `main` 时自动执行 48 套离线回归测试断言与 Cloudflare Workers Module 生产级预编译，100% 绿灯方可合并。
+- **独立演进**：已彻底解耦上游 upstream，不再运行任何上游同步任务，保持代码库纯净自主。
 
 ## Testing
 

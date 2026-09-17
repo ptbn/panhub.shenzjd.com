@@ -648,6 +648,9 @@ export class SearchService {
           if (!existing.description && result.content) {
             existing.description = result.content;
           }
+          if (!existing.magnetMeta && link.magnetMeta) {
+            existing.magnetMeta = link.magnetMeta;
+          }
           continue;
         }
 
@@ -659,6 +662,7 @@ export class SearchService {
           datetime: result.datetime,
           images: result.images,
           description: result.content,
+          magnetMeta: link.magnetMeta,
         });
         seenByCanonical.set(groupKey, idx);
       }

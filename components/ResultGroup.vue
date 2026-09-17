@@ -64,6 +64,18 @@
               <span v-if="isMagnet(r)" class="meta-tag badge-magnet">
                 🧲 磁力直连
               </span>
+              <!-- 磁力健康度雷达徽章 -->
+              <span
+                v-if="isMagnet(r) && r.magnetMeta"
+                class="meta-tag badge-health"
+                :class="'badge-health--' + r.magnetMeta.healthLevel"
+                :title="getHealthTitle(r.magnetMeta)"
+              >
+                <span v-if="r.magnetMeta.healthLevel === 'hot'">🔥 极速 ({{ r.magnetMeta.seeders }})</span>
+                <span v-else-if="r.magnetMeta.healthLevel === 'warm'">🟡 良好 ({{ r.magnetMeta.seeders }})</span>
+                <span v-else-if="r.magnetMeta.healthLevel === 'cold'">❄️ 冷门 ({{ r.magnetMeta.seeders ?? 0 }})</span>
+                <span v-else-if="r.magnetMeta.healthLevel === 'dead'">⚠️ 死种 (0)</span>
+              </span>
 
               <!-- 智能特征标签 -->
               <span v-if="getMeta(r).size" class="meta-tag badge-size">
@@ -195,6 +207,13 @@ const visibleItems = computed(() =>
 
 function isMagnet(r: any): boolean {
   return typeof r?.url === "string" && r.url.toLowerCase().startsWith("magnet:");
+}
+
+function getHealthTitle(meta?: any): string {
+  if (!meta) return "";
+  const s = meta.seeders !== undefined ? `做种数: ${meta.seeders}` : "做种未知";
+  const l = meta.leechers !== undefined ? `下载数: ${meta.leechers}` : "";
+  return [s, l].filter(Boolean).join(" | ");
 }
 
 function linkStatus(r: any) {
@@ -511,6 +530,36 @@ function formatMediaType(type: string) {
   border-color: rgba(16, 185, 129, 0.35);
   font-weight: 700;
   box-shadow: 0 0 8px rgba(16, 185, 129, 0.12);
+}
+
+/* 磁力健康度雷达徽章 */
+.meta-tag.badge-health {
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  letter-spacing: 0.02em;
+}
+.meta-tag.badge-health--hot {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+.meta-tag.badge-health--warm {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+.meta-tag.badge-health--cold {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.25);
+}
+.meta-tag.badge-health--dead {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+  border-color: rgba(107, 114, 128, 0.3);
 }
 
 /* 智能特征规格标签 */

@@ -1,5 +1,6 @@
 import { BaseAsyncPlugin } from "./manager";
 import type { SearchResult } from "../types/models";
+import { calculateMagnetMeta } from "../utils/magnetHealth";
 import { ofetch } from "ofetch";
 import { loggers } from "../utils/logger";
 import { resolveEnglishTitle } from "../utils/queryExpansion";
@@ -123,7 +124,14 @@ export class ApiBayPlugin extends BaseAsyncPlugin {
             datetime: new Date().toISOString(),
             title: `${zhPrefix}${badge}${item.name}${sizeText ? ` [${sizeText}]` : ""}`,
             content: `${seedText}${rawKw ? ` | 关联影视: ${rawKw}` : ""}${item.imdb ? ` | IMDb: ${item.imdb}` : ""}`,
-            links: [{ type: "magnet", url: magnet, password: "" }],
+            links: [
+              {
+                type: "magnet",
+                url: magnet,
+                password: "",
+                magnetMeta: calculateMagnetMeta(item.seeders, item.leechers),
+              },
+            ],
           });
         }
       } catch (err: any) {

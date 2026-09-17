@@ -829,3 +829,160 @@ export async function mountAListShare(
     };
   }
 }
+
+export interface AListFileOperationResult {
+  success: boolean;
+  message: string;
+  taskId?: string;
+}
+
+/**
+ * 调用 AList 官方 /api/fs/move 实现跨存储（本地 NAS 与 各大网盘）文件移动
+ * 支持异步任务队列调度，实现冷热分层归档
+ */
+export async function moveAListFiles(
+  url: string,
+  token: string,
+  srcDir: string,
+  dstDir: string,
+  names: string[],
+  allowPrivateIp = false
+): Promise<AListFileOperationResult> {
+  const check = validateNasTargetUrl(url, allowPrivateIp);
+  if (!check.valid) {
+    return { success: false, message: check.error! };
+  }
+
+  if (!names || names.length === 0) {
+    return { success: false, message: "移动目标文件名列表不能为空" };
+  }
+
+  const cleanUrl = url.replace(/\/+$/, "");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+  try {
+    const headers: Record<string, string> = {
+      "User-Agent": "PanHub-NAS-Client/2.0",
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = token;
+    }
+
+    const res = await fetch(`${cleanUrl}/api/fs/move`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        src_dir: srcDir.startsWith("/") ? srcDir : `/${srcDir}`,
+        dst_dir: dstDir.startsWith("/") ? dstDir : `/${dstDir}`,
+        names,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      return {
+        success: false,
+        message: `HTTP 响应异常 (${res.status} ${res.statusText})`,
+      };
+    }
+
+    const json = (await res.json()) as any;
+    if (json.code === 200) {
+      return {
+        success: true,
+        message: json.message || "文件移动任务已成功提交至 AList 传输队列",
+        taskId: json.data?.task_id || json.data?.id,
+      };
+    }
+
+    return {
+      success: false,
+      message: json.message || `AList 移动文件失败 (错误码: ${json.code})`,
+    };
+  } catch (e: any) {
+    clearTimeout(timer);
+    return {
+      success: false,
+      message: e.name === "AbortError" ? "AList 文件操作超时" : `网络请求失败: ${e.message}`,
+    };
+  }
+}
+
+/**
+ * 调用 AList 官方 /api/fs/copy 实现跨存储文件复制
+ */
+export async function copyAListFiles(
+  url: string,
+  token: string,
+  srcDir: string,
+  dstDir: string,
+  names: string[],
+  allowPrivateIp = false
+): Promise<AListFileOperationResult> {
+  const check = validateNasTargetUrl(url, allowPrivateIp);
+  if (!check.valid) {
+    return { success: false, message: check.error! };
+  }
+
+  if (!names || names.length === 0) {
+    return { success: false, message: "复制目标文件名列表不能为空" };
+  }
+
+  const cleanUrl = url.replace(/\/+$/, "");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+  try {
+    const headers: Record<string, string> = {
+      "User-Agent": "PanHub-NAS-Client/2.0",
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = token;
+    }
+
+    const res = await fetch(`${cleanUrl}/api/fs/copy`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        src_dir: srcDir.startsWith("/") ? srcDir : `/${srcDir}`,
+        dst_dir: dstDir.startsWith("/") ? dstDir : `/${dstDir}`,
+        names,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      return {
+        success: false,
+        message: `HTTP 响应异常 (${res.status} ${res.statusText})`,
+      };
+    }
+
+    const json = (await res.json()) as any;
+    if (json.code === 200) {
+      return {
+        success: true,
+        message: json.message || "文件复制任务已成功提交至 AList 传输队列",
+        taskId: json.data?.task_id || json.data?.id,
+      };
+    }
+
+    return {
+      success: false,
+      message: json.message || `AList 复制文件失败 (错误码: ${json.code})`,
+    };
+  } catch (e: any) {
+    clearTimeout(timer);
+    return {
+      success: false,
+      message: e.name === "AbortError" ? "AList 文件操作超时" : `网络请求失败: ${e.message}`,
+    };
+  }
+}
