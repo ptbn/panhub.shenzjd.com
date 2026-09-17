@@ -348,11 +348,13 @@ async function fetchExploreData(page: number, append = false) {
     }
   } catch (err) {
     console.error("[FilmExplore] 获取影视探索数据失败:", err);
-    if (!append) items.value = [];
-    hasMore.value = false;
+    if (!append && seq === currentSeq) items.value = [];
+    if (seq === currentSeq) hasMore.value = false;
   } finally {
-    loading.value = false;
-    loadingMore.value = false;
+    if (seq === currentSeq) {
+      loading.value = false;
+      loadingMore.value = false;
+    }
   }
 }
 
@@ -410,12 +412,23 @@ function onFilmClick(title: string, doubanId?: string) {
   props.onSearch(title.trim(), doubanId);
 }
 
+let initPromise: Promise<void> | null = null;
+
 async function init() {
-  if (items.value.length === 0) {
-    await fetchExploreData(1, false);
-    await nextTick();
-    setupObserver();
-  }
+  if (items.value.length > 0) return;
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    try {
+      await fetchExploreData(1, false);
+      await nextTick();
+      setupObserver();
+    } finally {
+      initPromise = null;
+    }
+  })();
+
+  return initPromise;
 }
 
 defineExpose({

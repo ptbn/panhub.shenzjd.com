@@ -77,6 +77,16 @@ describe("DoubanExploreService - 影视多维探索服务", () => {
     expect(decoded).toContain("year_range=2026,2026");
   });
 
+  it("动漫大类应正确自动映射为豆瓣规范 tags=动画", () => {
+    const query: DoubanExploreQuery = {
+      type: "动漫",
+    };
+    const url = buildDoubanExploreUrl(query);
+    const decoded = decodeURIComponent(url);
+
+    expect(decoded).toContain("tags=动画");
+  });
+
   it("内存缓存功能应正常存储与读取", () => {
     const cacheKey = "douban-explore:test";
     const dummyData = {
@@ -102,5 +112,31 @@ describe("DoubanExploreService - 影视多维探索服务", () => {
 
     expect(cached.hit).toBe(true);
     expect(cached.value?.items[0].title).toBe("星际穿越");
+  });
+
+  it("当上游接口异常或被拦截时，保底种子库应能按条件稳定召回精选影视作品", async () => {
+    const { filterFallbackSeeds, FALLBACK_EXPLORE_SEEDS } = await import(
+      "../../server/core/services/doubanExploreService"
+    );
+
+    // 1. 默认查询保底
+    const defaultResult = filterFallbackSeeds({});
+    expect(defaultResult.items.length).toBeGreaterThan(0);
+    expect(defaultResult.items.some((i) => i.title.includes("肖申克") || i.title.includes("奥德赛"))).toBe(true);
+
+    // 2. 电视剧筛选保底
+    const tvResult = filterFallbackSeeds({ type: "电视剧" });
+    expect(tvResult.items.length).toBeGreaterThan(0);
+    expect(tvResult.items.some((i) => i.title.includes("狂飙") || i.title.includes("繁花"))).toBe(true);
+
+    // 3. 动漫筛选保底（自动映射为动画类）
+    const animeResult = filterFallbackSeeds({ type: "动漫" });
+    expect(animeResult.items.length).toBeGreaterThan(0);
+    expect(animeResult.items.some((i) => i.title.includes("鬼灭之刃") || i.title.includes("千与千寻"))).toBe(true);
+
+    // 4. 高分科幻筛选保底
+    const scifiResult = filterFallbackSeeds({ genre: "科幻", scoreRange: "9-10" });
+    expect(scifiResult.items.length).toBeGreaterThan(0);
+    expect(scifiResult.items.some((i) => i.title.includes("星际穿越"))).toBe(true);
   });
 });
